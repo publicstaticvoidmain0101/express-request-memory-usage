@@ -1,17 +1,36 @@
 'use strict';
 
-let { getTable } = require('console.table');
+let Table = require('cli-table');
+
+const types = [
+    'rss',
+    'heapTotal',
+    'heapUsed',
+    'external',
+];
 
 let getUsageString = value => `${Math.round(value / 1024 / 1024 * 100) / 100} MB`;
-let getUsageTable = (usageOnStart, usageOnFinish) => {
+let getUsageStats = (usageOnStart, usageOnFinish) => {
     let result = { start: {}, finish: {} };
 
-    Object.keys(usageOnStart).forEach((key) => {
+    types.forEach((key) => {
         result.start[key] = getUsageString(usageOnStart[key]);
         result.finish[key] = getUsageString(usageOnFinish[key]);
     });
 
-    return getTable(result);
+    return result;
+};
+let getUsageTable = usageStats => {
+    let table = new Table({ head: ['', ...types] });
+
+    Object.keys(usageStats).forEach(stage => {
+        let stageStats = usageStats[stage];
+        let values = types.map(type => stageStats[type]);
+
+        table.push({[stage]: values});
+    });
+
+    return table.toString();
 };
 
 let getMiddleware = logger => (req, res, next) => {
@@ -20,8 +39,8 @@ let getMiddleware = logger => (req, res, next) => {
     next();
     res.once('finish', () => {
         let usageOnFinish = process.memoryUsage();
-
-        let table = getUsageTable(usageOnStart, usageOnFinish);
+        let usageStats = getUsageStats(usageOnStart, usageOnFinish);
+        let table = getUsageTable(usageStats);
 
         logger(table);
     });
